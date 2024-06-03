@@ -1,0 +1,24 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb
+    driverClassName: org.h2.Driver
+    username: sa
+    password:
+    schema: classpath:schema.sql
+  application:
+    name: armin
+  batch:
+    jdbc:
+      initialize-schema: always
+server:
+  servlet:
+    context-path: /armin
+mybatis:
+  mapper-locations: classpath:/sqlmap/*.xml
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+  webjars:
+    prefix: ""

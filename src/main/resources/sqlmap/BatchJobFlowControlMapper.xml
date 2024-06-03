@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.williamm56i.armin.persistence.dao.BatchJobFlowControlDao">
+    <resultMap id="BaseResultMap" type="com.williamm56i.armin.persistence.vo.BatchJobFlowControl">
+        <id column="JOB_NAME" property="jobName" jdbcType="VARCHAR" />
+        <id column="STEP_NAME" property="stepName" jdbcType="VARCHAR" />
+        <result column="STEP_ORDER" property="stepOrder" jdbcType="DECIMAL" />
+        <result column="IS_EXECUTABLE" property="isExecutable" jdbcType="VARCHAR" />
+    </resultMap>
+    <sql id="Base_Column_List">
+        JOB_NAME, STEP_NAME, STEP_ORDER, IS_EXECUTABLE
+    </sql>
+    <select id="selectByJobName" resultMap="BaseResultMap">
+        select
+            <include refid="Base_Column_List" />
+        from BATCH_JOB_FLOW_CONTROL
+        <where>
+            JOB_NAME = #{jobName,jdbcType=VARCHAR}
+        </where>
+    </select>
+</mapper>
