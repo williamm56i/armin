@@ -2,6 +2,7 @@ package com.williamm56i.armin.service.impl;
 
 import com.williamm56i.armin.persistence.dao.BatchJobTriggerConfigDao;
 import com.williamm56i.armin.service.BatchService;
+import io.micrometer.common.util.StringUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.JobExecution;
@@ -37,8 +38,19 @@ public class BatchServiceImpl implements BatchService {
 
     @Override
     public long executeJob(String beanName) throws Exception {
+        return executeJob(beanName, null, null);
+    }
+
+    @Override
+    public long executeJob(String beanName, String reportName, Long reportNo) throws Exception{
         JobParametersBuilder builder = new JobParametersBuilder();
         builder.addDate("sysdate", new Date());
+        if (StringUtils.isNotEmpty(reportName)) {
+            builder.addString("reportName", reportName);
+        }
+        if (reportNo != null) {
+            builder.addLong("reportNo", reportNo);
+        }
         JobParameters params = builder.toJobParameters();
         Job job = (Job) applicationContext.getBean(beanName);
         JobExecution jobExecution = jobLauncher.run(job, params);

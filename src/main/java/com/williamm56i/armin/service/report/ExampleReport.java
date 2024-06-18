@@ -1,7 +1,11 @@
 package com.williamm56i.armin.service.report;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.williamm56i.armin.persistence.dao.ReportRecordDao;
 import com.williamm56i.armin.persistence.dao.SysUserDao;
+import com.williamm56i.armin.persistence.vo.ReportRecord;
+import com.williamm56i.armin.persistence.vo.SysCode;
 import com.williamm56i.armin.persistence.vo.SysUser;
 import com.williamm56i.armin.utils.DateUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -17,7 +21,11 @@ import java.util.*;
 public class ExampleReport extends Report{
 
     @Autowired
+    ObjectMapper objectMapper;
+    @Autowired
     SysUserDao sysUserDao;
+    @Autowired
+    ReportRecordDao reportRecordDao;
 
     @Override
     public void generate(BigDecimal reportNo, Long jobId) throws IOException {
@@ -25,8 +33,10 @@ public class ExampleReport extends Report{
         String outputFilePath = "./ExampleReport_" + DateUtils.makeDateToString(new Date(), DateUtils.YYYYMMDDHHMISS) + ".xlsx";
 
         /* 資料準備 */
+        ReportRecord record = reportRecordDao.selectByPrimaryKey(reportNo);
+        String json = record.getReportParams();
+
         String title = getTitle();
-        String json = "get json from table"; // from Table
         Map<String, String> headerMap = getHeader(json);
         List<Map<Integer, String>> extraColumnMapList = getExtraColumn();
         Map<String, String> columnMap = getColumn();
@@ -40,7 +50,10 @@ public class ExampleReport extends Report{
         log.info("generate excel completed!");
 
         /* 寫入資料庫 */
-        // TODO update Table
+        record.setReportNo(reportNo);
+        record.setReport(bytes);
+        record.setJobId(new BigDecimal(jobId));
+        reportRecordDao.updateReport(record);
         log.info("update report record");
 //        deleteFile(outputFilePath);
 
@@ -54,11 +67,14 @@ public class ExampleReport extends Report{
 
     @Override
     protected Map<String, String> getHeader(String json) {
-        // TODO get information from json
         Map<String, String> headerMap = new LinkedHashMap<>();
-        String startDate = DateUtils.makeDateToString(new Date(), DateUtils.YYYYMMDD_SLASH); // from json
-        String endDate = DateUtils.makeDateToString(new Date(), DateUtils.YYYYMMDD_SLASH); // from json
-        headerMap.put("查詢區間", startDate + " - " + endDate);
+        try {
+            SysUser vo = objectMapper.readValue(json, SysUser.class);
+            String reportDate = DateUtils.makeDateToString(new Date(), DateUtils.YYYYMMDD_SLASH);
+            headerMap.put("產出日期", reportDate);
+        } catch (Exception e) {
+            log.error("JSON parser fail");
+        }
         return headerMap;
     }
 
@@ -84,10 +100,10 @@ public class ExampleReport extends Report{
     protected Map<String, Integer> getWidth() {
         Map<String, Integer> widthMap = new HashMap<>();
         widthMap.put("account", 15);
-        widthMap.put("userName", 20);
+        widthMap.put("userName", 15);
         widthMap.put("email", 30);
         widthMap.put("createId", 15);
-        widthMap.put("createDate", 15);
+        widthMap.put("createDate", 20);
         widthMap.put("updateId", 15);
         widthMap.put("updateDate", 15);
         return widthMap;
@@ -95,8 +111,8 @@ public class ExampleReport extends Report{
 
     @Override
     protected List<Map<String, Object>> getContent(String json) throws JsonProcessingException {
-        // TODO get query conditions from json
-        List<SysUser> sysUserList = sysUserDao.selectByConditions(null, null, null); // from json
+        SysUser vo = objectMapper.readValue(json, SysUser.class);
+        List<SysUser> sysUserList = sysUserDao.selectByConditions(vo.getAccount(), vo.getUserName(), vo.getEmail()); // from json
         List<Map<String, Object>> list = new ArrayList<>();
         sysUserList.forEach( sysUser -> {
             Map<String, Object> map = new LinkedHashMap<>();

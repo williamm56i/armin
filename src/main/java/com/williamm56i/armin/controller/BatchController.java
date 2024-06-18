@@ -3,6 +3,7 @@ package com.williamm56i.armin.controller;
 import com.williamm56i.armin.service.BatchService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.apache.ibatis.annotations.Param;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -17,8 +18,8 @@ public class BatchController {
 
     @Operation(summary = "執行批次")
     @GetMapping(value = "/executeJob")
-    public long executeJob(@RequestParam(value = "beanName") String beanName) throws Exception {
-        return batchService.executeJob(beanName);
+    public long executeJob(@RequestParam(value = "beanName") String beanName, @RequestParam(value = "reportName", required = false) String reportName, @RequestParam(value = "reportNo", required = false) Long reportNo) throws Exception {
+        return batchService.executeJob(beanName, reportName, reportNo);
     }
 
     @Operation(summary = "更新批次流程")

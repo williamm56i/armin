@@ -10,6 +10,7 @@ import java.io.OutputStream;
 import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.util.Comparator;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
@@ -114,6 +115,11 @@ public class ReportGenerator {
                     dataStyle.setAlignment(HorizontalAlignment.RIGHT);
                     dataCell.setCellStyle(dataStyle);
                     dataCell.setCellValue(((BigDecimal) data).doubleValue());
+                } else if (data instanceof Date) {
+                    Cell dataCell = contentRow.createCell(col++);
+                    CellStyle dataStyle = createCellStyle(workbook, 10, true, false, HorizontalAlignment.LEFT, "微軟正黑體");
+                    dataCell.setCellStyle(dataStyle);
+                    dataCell.setCellValue(DateUtils.makeDateToString((Date) data, DateUtils.YYYYMMDD_SLASH_TIME));
                 } else  {
                     Cell dataCell = contentRow.createCell(col++);
                     CellStyle dataStyle = createCellStyle(workbook, 10, true, false, HorizontalAlignment.RIGHT, "微軟正黑體");

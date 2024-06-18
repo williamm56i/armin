@@ -10,4 +10,6 @@ import java.math.BigDecimal;
 public interface ReportRecordDao {
 
     ReportRecord selectByPrimaryKey(@Param("reportNo")BigDecimal reportNo);
+
+    void updateReport(ReportRecord record);
 }

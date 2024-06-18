@@ -5,6 +5,8 @@ INSERT INTO BATCH_JOB_FLOW_CONTROL (JOB_NAME, STEP_NAME, STEP_ORDER, IS_EXECUTAB
 VALUES ('ExampleJob', 'example1-step', 1, 'Y');
 INSERT INTO BATCH_JOB_FLOW_CONTROL (JOB_NAME, STEP_NAME, STEP_ORDER, IS_EXECUTABLE)
 VALUES ('ExampleJob', 'example2-step', 2, 'Y');
+INSERT INTO BATCH_JOB_FLOW_CONTROL (JOB_NAME, STEP_NAME, STEP_ORDER, IS_EXECUTABLE)
+VALUES ('ReportJob', 'report-step', 1, 'Y');
 
 INSERT INTO BATCH_JOB_TRIGGER_CONFIG(JOB_NAME, JOB_DESC, BEAN_NAME, TRIGGER_NAME, CRON_TRIGGER, ENABLE, CREATE_ID, CREATE_DATE, UPDATE_ID, UPDATE_DATE)
 VALUES ('ExampleJob', '範例作業', 'example-job', 'example-job-trigger', '0 * * * * ?', 'Y', 'SYS', NOW(), null, null);
@@ -19,4 +21,4 @@ INSERT INTO SYS_USER (ACCOUNT, USER_NAME, EMAIL, CREATE_ID, CREATE_DATE, UPDATE_
 VALUES ('A8672', 'Ruby', 'ruby@gmail.com', 'SYS', NOW(), null, null);
 
 INSERT INTO REPORT_RECORD (REPORT_NAME, REPORT_PARAMS, REPORT, JOB_ID, CREATE_ID, CREATE_DATE)
-VALUES ('ExampleReport', '{"userName":"Liz"}', null, null, 'SYS', null);
+VALUES ('ExampleReport', '{"userName":""}', null, null, 'SYS', null);

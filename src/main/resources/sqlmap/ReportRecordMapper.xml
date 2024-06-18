@@ -18,11 +18,19 @@
     <sql id="Blob_Column_List">
         REPORT_PARAMS, REPORT
     </sql>
-    <select id="selectAll" resultMap="ResultMapWithBLOBs">
+    <select id="selectByPrimaryKey" resultMap="ResultMapWithBLOBs">
         select
             <include refid="Base_Column_List" />,
             <include refid="Blob_Column_List" />
         from REPORT_RECORD
         where REPORT_NO = #{reportNo,jdbcType=DECIMAL}
     </select>
+    <update id="updateReport">
+        update REPORT_RECORD
+        set
+            REPORT = #{report,jdbcType=BLOB},
+            JOB_ID = #{jobId,jdbcType=DECIMAL}
+        where
+            REPORT_NO = #{reportNo,jdbcType=DECIMAL}
+    </update>
 </mapper>
