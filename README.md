@@ -165,3 +165,89 @@ public class ExampleJob extends BaseJob {
   }
 }
 ```
+#### 動態載入Job執行流程
+* 欲解決無運問題：批次執行流程以程式碼定義於job中，若因業務需要，需不執行其中某個step或要調整step執行順序，則需調整程式碼後安排公司上線程序，曠日費時
+* 做法概念：將job執行流程定義於資料庫中，專案啟動時載入當下資料表設定之流程生效之
+* 實作方法：定義BaseJob，內含setFlow方法，至資料表(BATCH_JOB_FLOW_CONTROL)中取的當前job的欲執行的step名稱，逐名稱以getBean方式取得實例組成flow後回傳
+* Job改寫：所有job需繼承BaseJob，並將流程串接寫法改以呼叫setFlow取得flow後組入job，完成動態載入
+```java
+public class BaseJob {
+
+    @Autowired
+    BatchJobFlowControlDao batchJobFlowControlDao;
+    @Autowired
+    ApplicationContext applicationContext;
+
+    public Flow setFlow(String jobName, String flowName) {
+        FlowBuilder<Flow> flow = new FlowBuilder<>(flowName);
+        List<BatchJobFlowControl> stepList = batchJobFlowControlDao.selectByJobName(jobName);
+        boolean isFirst = true;
+        for (BatchJobFlowControl step: stepList) {
+            Step stepObj  = (Step) applicationContext.getBean(step.getStepName());
+            if (isFirst) {
+                flow.start(stepObj);
+                isFirst = false;
+            } else {
+                flow.next(stepObj);
+            }
+        }
+        return flow.build();
+    }
+}
+```
+```
+-- selectByJobName
+select * from BATCH_JOB_FLOW_CONTROL where JOB_NAME = #{jobName} and IS_EXECUTABLE = 'Y'
+order by STEP_ORDER asc
+```
+```
+@Bean("example-job")
+public Job exampleJob() {
+    return new JobBuilder("ExampleJob", jobRepository)
+            .incrementer(new RunIdIncrementer())
+            .listener(baseJobListener)
+            .start(setFlow("ExampleJob", "ExampleFlow"))
+            .end()
+            .build();
+}
+```
+#### Runtime更新Job執行流程
+* 欲解決維運問題：雖已實現動態載入執行流程，但流程仍在專案啟動後就已決定，調整資料表後的流程需要重啟專案才會生效，正式環境不具備能隨時重啟的條件
+* 作法概念：調整資料表流程後，移除專案中的Job bean再重新建立，並取消JobRegistry中的註冊；待下次執行批次時重新觸發載入流程，達到Runtime更新的目的
+* 實作方法：reloadJobFlow方法實作上述邏輯並提供API
+```java
+@Service
+@Slf4j
+public class BatchServiceImpl implements BatchService {
+    // 上略
+  @Override
+  public String reloadJobFlow(String beanName) {
+    BeanDefinitionRegistry beanDefinitionRegistry = (BeanDefinitionRegistry) applicationContext.getAutowireCapableBeanFactory();
+    BeanDefinition beanDefinition = beanDefinitionRegistry.getBeanDefinition(beanName);
+    beanDefinitionRegistry.removeBeanDefinition(beanName);
+    log.info("remove {} bean definition completed!", beanName);
+    String jobName = batchJobTriggerConfigDao.selectJobNameByBean(beanName);
+    if (jobRepository.getJobNames().contains(jobName)) {
+      jobRegistry.unregister(jobName);
+    }
+    beanDefinitionRegistry.registerBeanDefinition(beanName, beanDefinition);
+    log.info("{} is reloaded", beanName);
+    return beanName + " flow is reloaded!";
+  }
+  // 下略
+}
+```
+
+### Report模組（報表）
+* 解決通點：手刻worksheet純屬苦工，欲提供一個僅需傳入資料即能快速生成報表的模組，讓開發人員能專注於資料邏輯處理
+* 報表包含以下區塊，可依需求組裝/移除：
+  * 報表標題（title）
+  * 報表產生條件資訊區（header）
+  * 主要資料區（column, content）
+  * 頁尾資訊（footer）
+* 模組元件：
+  * utils.ReportGenerator：實際刻worksheet的苦力，將個區塊拼入worksheet
+  * service.report.Report：定義取得各區塊資料以及生成的抽象方法，供實際業務邏輯報表繼承後實作，以及定義產生Excel、刪除暫存實體檔之實作方法，使用到ReportGenerator
+  * ReportJob：定義執行ReportTasklet的批次（詳細定義方式見上方Spring Batch介紹），依照參數的reportName以getBean方法取得欲執行的報表並以Report承接之，再以多型執行生成方法開始生成報表
+* 開發人員實作：
+  * service.report.XXXReport：業務邏輯報表，開發人員接收需求後建立專屬XXXReport並繼承Report
