@@ -17,6 +17,20 @@ Batch架構專案，定義批次流程與業務邏輯實作，並提供接口以
 * 0.0.1-SNAPSHOT
     * 初版
 
+### 執行
+* 打包jar
+```
+mvn package
+```
+* build image
+```
+docker build --tag armin:latest .
+```
+* run
+```
+docker run --name ARMIN -p 8180:8180 -d armin:latest
+```
+
 ---
 
 ### Spring Batch介紹
