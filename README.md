@@ -179,6 +179,56 @@ public class ExampleJob extends BaseJob {
   }
 }
 ```
+#### 相關設定
+* 定義於ArminApplication中
+* @EnableBatchProcessing
+* job策略
+  * setIsolationLevelForCreate("ISOLATION_READ_COMMITTED")：讓每支job有獨立的session，避免當批次觸發時間相同時造成一方失敗
+  * setTablePrefix("BATCH_")：定義BATCH TABLE PREFIX，當多個系統共用資料庫時另外以前綴區分對應批次控制檔（如：XXX_BATCH_)
+  * 非同步機制，批次觸發後立即返回jobId，不等批次完成
+```java
+@SpringBootApplication
+@OpenAPIDefinition
+@EnableBatchProcessing
+public class ArminApplication {
+
+	@Autowired
+	DataSource dataSource;
+
+	public static void main(String[] args) {
+		SpringApplication.run(ArminApplication.class, args);
+	}
+
+	@Bean
+	public PlatformTransactionManager transactionManager() {
+		DataSourceTransactionManager transactionManager = new DataSourceTransactionManager(dataSource);
+		transactionManager.setGlobalRollbackOnParticipationFailure(false);
+		transactionManager.setDefaultTimeout(300);
+		return transactionManager;
+	}
+
+	@Bean
+	public JobRepository getJobRepository() throws Exception {
+		JobRepositoryFactoryBean jobRepositoryFactoryBean = new JobRepositoryFactoryBean();
+		jobRepositoryFactoryBean.setDataSource(dataSource);
+		jobRepositoryFactoryBean.setTransactionManager(transactionManager());
+		jobRepositoryFactoryBean.setIsolationLevelForCreate("ISOLATION_READ_COMMITTED");
+		jobRepositoryFactoryBean.setTablePrefix("BATCH_");
+		jobRepositoryFactoryBean.afterPropertiesSet();
+		return jobRepositoryFactoryBean.getObject();
+	}
+
+	@Bean("AsyncJobLauncher")
+	public JobLauncher jobLauncher() throws Exception {
+		TaskExecutorJobLauncher jobLauncher = new TaskExecutorJobLauncher();
+		jobLauncher.setJobRepository(getJobRepository());
+		jobLauncher.setTaskExecutor(new SimpleAsyncTaskExecutor());
+		jobLauncher.afterPropertiesSet();
+		return jobLauncher;
+	}
+}
+```
+
 #### 動態載入Job執行流程
 * 欲解決無運問題：批次執行流程以程式碼定義於job中，若因業務需要，需不執行其中某個step或要調整step執行順序，則需調整程式碼後安排公司上線程序，曠日費時
 * 做法概念：將job執行流程定義於資料庫中，專案啟動時載入當下資料表設定之流程生效之
