@@ -20,7 +20,7 @@ Batch架構專案，定義批次流程與業務邏輯實作，並提供接口以
 ### 執行
 * 打包jar
 ```
-mvn package
+mvn install
 ```
 * build image
 ```
