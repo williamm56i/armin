@@ -5,8 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.williamm56i.armin.persistence.dao.ReportRecordDao;
 import com.williamm56i.armin.persistence.dao.SysUserDao;
 import com.williamm56i.armin.persistence.vo.ReportRecord;
-import com.williamm56i.armin.persistence.vo.SysCode;
 import com.williamm56i.armin.persistence.vo.SysUser;
+import com.williamm56i.armin.service.SysUserService;
 import com.williamm56i.armin.utils.DateUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,12 +18,12 @@ import java.util.*;
 
 @Service("ExampleReport")
 @Slf4j
-public class ExampleReport extends Report{
+public class ExampleReport extends Report {
 
     @Autowired
     ObjectMapper objectMapper;
     @Autowired
-    SysUserDao sysUserDao;
+    SysUserService sysUserService;
     @Autowired
     ReportRecordDao reportRecordDao;
 
@@ -37,16 +37,17 @@ public class ExampleReport extends Report{
         String json = record.getReportParams();
 
         String title = getTitle();
+        List<String> sheetList = getSheetList();
         Map<String, String> headerMap = getHeader(json);
-        List<Map<Integer, String>> extraColumnMapList = getExtraColumn();
-        Map<String, String> columnMap = getColumn();
-        Map<String, Integer> widthMap = getWidth();
-        List<Map<String, Object>> content = getContent(json);
-        List<String> footerList = getFooter();
+        Map<String, List<Map<Integer, String>>> extraColumnMaps = getExtraColumns(sheetList);
+        Map<String, Map<String, String>> columnMaps = getColumns(sheetList);
+        Map<String, Map<String, Integer>> widthMaps = getWidths(sheetList);
+        Map<String, List<Map<String, Object>>> contents = getContents(sheetList, json);
+        Map<String, List<String>> footerMaps = getFooters(sheetList);
 
         /* 產生報表 */
         log.info("generate excel..");
-        byte[] bytes = generateExcel(outputFilePath, title, headerMap, extraColumnMapList, columnMap, widthMap, content, footerList);
+        byte[] bytes = generateExcel(outputFilePath, title, headerMap, sheetList, extraColumnMaps, columnMaps, widthMaps, contents, footerMaps);
         log.info("generate excel completed!");
 
         /* 寫入資料庫 */
@@ -66,6 +67,11 @@ public class ExampleReport extends Report{
     }
 
     @Override
+    protected List<String> getSheetList() {
+        return List.of("工作表1");
+    }
+
+    @Override
     protected Map<String, String> getHeader(String json) {
         Map<String, String> headerMap = new LinkedHashMap<>();
         try {
@@ -79,12 +85,13 @@ public class ExampleReport extends Report{
     }
 
     @Override
-    protected List<Map<Integer, String>> getExtraColumn() {
-        return null;
+    protected Map<String, List<Map<Integer, String>>> getExtraColumns(List<String> sheetList) {
+        return new LinkedHashMap<>();
     }
 
     @Override
-    protected Map<String, String> getColumn() {
+    protected Map<String, Map<String, String>> getColumns(List<String> sheetList) {
+        Map<String, Map<String, String>> columnMaps = new LinkedHashMap<>();
         Map<String, String> columnMap = new LinkedHashMap<>();
         columnMap.put("account", "帳號");
         columnMap.put("userName", "姓名");
@@ -93,11 +100,13 @@ public class ExampleReport extends Report{
         columnMap.put("createDate", "建立日期");
         columnMap.put("updateId", "異動人員");
         columnMap.put("updateDate", "異動日期");
-        return columnMap;
+        columnMaps.put(sheetList.get(0), columnMap);
+        return columnMaps;
     }
 
     @Override
-    protected Map<String, Integer> getWidth() {
+    protected Map<String, Map<String, Integer>> getWidths(List<String> sheetList) {
+        Map<String, Map<String, Integer>> widthMaps = new LinkedHashMap<>();
         Map<String, Integer> widthMap = new HashMap<>();
         widthMap.put("account", 15);
         widthMap.put("userName", 15);
@@ -106,32 +115,23 @@ public class ExampleReport extends Report{
         widthMap.put("createDate", 20);
         widthMap.put("updateId", 15);
         widthMap.put("updateDate", 15);
-        return widthMap;
+        widthMaps.put(sheetList.get(0), widthMap);
+        return widthMaps;
     }
 
     @Override
-    protected List<Map<String, Object>> getContent(String json) throws JsonProcessingException {
-        SysUser vo = objectMapper.readValue(json, SysUser.class);
-        List<SysUser> sysUserList = sysUserDao.selectByConditions(vo.getAccount(), vo.getUserName(), vo.getEmail()); // from json
-        List<Map<String, Object>> list = new ArrayList<>();
-        sysUserList.forEach( sysUser -> {
-            Map<String, Object> map = new LinkedHashMap<>();
-            map.put("account", sysUser.getAccount());
-            map.put("userName", sysUser.getUserName());
-            map.put("email", sysUser.getEmail());
-            map.put("createId", sysUser.getCreateId());
-            map.put("createDate", sysUser.getCreateDate());
-            map.put("updateId", sysUser.getUpdateId());
-            map.put("updateDate", sysUser.getUpdateDate());
-            list.add(map);
-        });
-        return list;
+    protected Map<String, List<Map<String, Object>>> getContents(List<String> sheetList, String json) throws JsonProcessingException {
+        Map<String, List<Map<String, Object>>> contents = new LinkedHashMap<>();
+        contents.put(sheetList.get(0), sysUserService.getSysUser(json));
+        return contents;
     }
 
     @Override
-    protected List<String> getFooter() {
+    protected Map<String, List<String>> getFooters(List<String> sheetList) {
+        Map<String, List<String>> footerMaps = new LinkedHashMap<>();
         List<String> footerList = new ArrayList<>();
         footerList.add("範例表尾");
-        return footerList;
+        footerMaps.put(sheetList.get(0), footerList);
+        return footerMaps;
     }
 }
