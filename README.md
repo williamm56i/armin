@@ -3,7 +3,7 @@ Batch架構專案，定義批次流程與業務邏輯實作，並提供接口以
 
 ### 技術框架
 * Java version 18
-* Spring boot 3.3.10
+* Spring boot 3.3.11
 * Spring Batch
 * Maven
 * Mybatis
@@ -230,7 +230,7 @@ public class ArminApplication {
 ```
 
 #### 動態載入Job執行流程
-* 欲解決無運問題：批次執行流程以程式碼定義於job中，若因業務需要，需不執行其中某個step或要調整step執行順序，則需調整程式碼後安排公司上線程序，曠日費時
+* 欲解決維運問題：批次執行流程以程式碼定義於job中，若因業務需要，需不執行其中某個step或要調整step執行順序，則需調整程式碼後安排公司上線程序，曠日費時
 * 做法概念：將job執行流程定義於資料庫中，專案啟動時載入當下資料表設定之流程生效之
 * 實作方法：定義BaseJob，內含setFlow方法，至資料表(BATCH_JOB_FLOW_CONTROL)中取的當前job的欲執行的step名稱，逐名稱以getBean方式取得實例組成flow後回傳
 * Job改寫：所有job需繼承BaseJob，並將流程串接寫法改以呼叫setFlow取得flow後組入job，完成動態載入
