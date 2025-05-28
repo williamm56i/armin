@@ -3,7 +3,7 @@ Batch架構專案，定義批次流程與業務邏輯實作，並提供接口以
 
 ### 技術框架
 * Java version 18
-* Spring boot 3.3.11
+* Spring boot 3.3.12
 * Spring Batch
 * Maven
 * Mybatis
