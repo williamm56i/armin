@@ -179,6 +179,137 @@ public class ExampleJob extends BaseJob {
   }
 }
 ```
+
+#### Job Flow介紹
+##### 一般模式：A Step做完中做B Step，B Step做完接著做C Step，C Step做完後結束Job (參考上方)
+##### 條件模式：A Step做完後判斷Step結束狀態
+* 若A為COMPLETED則接著做B Step，B Step做完接著做C Step
+* 若A為FAILED則改做D Step
+* C或D完成後結束Job
+```java
+@Configuration
+@Slf4j
+public class ConditionJob {
+
+    @Autowired
+    ExampleStep exampleStep;
+    @Autowired
+    JobRepository jobRepository;
+    @Autowired
+    BaseJobListener baseJobListener;
+
+    @Bean("condition-job")
+    public Job conditionJob() {
+        return new JobBuilder("ConditionJob", jobRepository)
+                .incrementer(new RunIdIncrementer())
+                .listener(baseJobListener)
+                .start(exampleStep.exampleAStep()).on("COMPLETED")
+                    .to(exampleStep.exampleBStep()).next(exampleStep.exampleCStep())
+                .from(exampleStep.exampleAStep()).on("FAILED")
+                    .to(exampleStep.exampleDStep())
+                .end()
+                .build();
+    }
+}
+```
+* .on()判斷結束狀態為「Step的結束狀態」，非Tasklet
+  * 要讓Step FAILED必須要在Tasklet中拋出例外，否則執行到最後return RepeatStatus.FINISHED就是COMPLETED
+  * 或者在StepListener中的afterStep()內控制ExitStatus
+* A Step FAILED後執行D Step，Job會記錄為COMPLETED
+  * 若要A Step FAILED時Job也FAILED，則.on("FAILED").fail()，不能再執行D Step
+
+##### 條件模式-decider：A Step做完後透過decider決定流程走向
+* 若為COMPLETED則接著做B Step，B Step做完接著做C Step
+* 若為FAILED則做D Step
+* C或D完成後結束Job
+```java
+@Configuration
+@Slf4j
+public class DecideJob {
+
+  @Autowired
+  ExampleStep exampleStep;
+  @Autowired
+  ExampleDecider exampleDecider;
+  @Autowired
+  JobRepository jobRepository;
+  @Autowired
+  BaseJobListener baseJobListener;
+
+  @Bean("decide-job")
+  public Job decideJob() {
+    return new JobBuilder("DecideJob", jobRepository)
+            .incrementer(new RunIdIncrementer())
+            .listener(baseJobListener)
+            .start(exampleStep.exampleAStep())
+            .next(exampleDecider).on("COMPLETED")
+            .to(exampleStep.exampleBStep()).next(exampleStep.exampleCStep())
+            .from(exampleDecider).on("FAILED")
+            .to(exampleStep.exampleDStep())
+            .end()
+            .build();
+  }
+}
+```
+```java
+@Component
+@Slf4j
+public class ExampleDecider implements JobExecutionDecider {
+
+    @Override
+    public FlowExecutionStatus decide(JobExecution jobExecution, StepExecution stepExecution) {
+        // 邏輯
+        log.info("decide");
+        int random = new Random().nextInt(10) + 1;
+        if (random % 2 == 0) {
+          return new FlowExecutionStatus("COMPLETED");
+        }
+        return new FlowExecutionStatus("FAILED");
+    }
+}
+```
+* 相較於一般的條件模式，decider可以透過業務邏輯決定流程走向
+
+##### 併行模式：A Step做完後併行執行B Step、C Step，B、C Step做完後執行D Step，D Step做完後結束Job
+```java
+@Configuration
+@Slf4j
+public class ParallelJob {
+
+    @Autowired
+    ExampleStep exampleStep;
+    @Autowired
+    JobRepository jobRepository;
+    @Autowired
+    BaseJobListener baseJobListener;
+
+    @Bean("parallel-job")
+    public Job parallelJob() {
+        return new JobBuilder("ParallelJob", jobRepository)
+                .incrementer(new RunIdIncrementer())
+                .listener(baseJobListener)
+                .flow(exampleStep.exampleAStep())
+                .next(parallelFlow())
+                .next(exampleStep.exampleDStep())
+                .end()
+                .build();
+    }
+
+    private Flow parallelFlow() {
+        FlowBuilder<Flow> flowB = new FlowBuilder<>("bFlow");
+        FlowBuilder<Flow> flowC = new FlowBuilder<>("cFlow");
+        Flow b = flowB.start(exampleStep.exampleBStep()).build();
+        Flow c = flowC.start(exampleStep.exampleCStep()).build();
+
+        FlowBuilder<Flow> flow = new FlowBuilder<>("parallelFlow");
+        return flow.split(new SimpleAsyncTaskExecutor()).add(b, c).build();
+    }
+}
+```
+* 要併行的Step需以FlowBuilder組成小Flow
+* 製作一個Flow以split將小Flow組成併行Flow
+* 最後在Job中組裝A Step -> 併行Flow -> D Step
+
 #### 相關設定
 * 定義於ArminApplication中
 * @EnableBatchProcessing
@@ -229,7 +360,7 @@ public class ArminApplication {
 }
 ```
 
-#### 動態載入Job執行流程
+#### 動態載入Job執行流程 (僅支援Job Flow一般模式)
 * 欲解決維運問題：批次執行流程以程式碼定義於job中，若因業務需要，需不執行其中某個step或要調整step執行順序，則需調整程式碼後安排公司上線程序，曠日費時
 * 做法概念：將job執行流程定義於資料庫中，專案啟動時載入當下資料表設定之流程生效之
 * 實作方法：定義BaseJob，內含setFlow方法，至資料表(BATCH_JOB_FLOW_CONTROL)中取的當前job的欲執行的step名稱，逐名稱以getBean方式取得實例組成flow後回傳
@@ -275,7 +406,7 @@ public Job exampleJob() {
             .build();
 }
 ```
-#### Runtime更新Job執行流程
+#### Runtime更新Job執行流程 (僅支援Job Flow一般模式)
 * 欲解決維運問題：雖已實現動態載入執行流程，但流程仍在專案啟動後就已決定，調整資料表後的流程需要重啟專案才會生效，正式環境不具備能隨時重啟的條件
 * 作法概念：調整資料表流程後，移除專案中的Job bean再重新建立，並取消JobRegistry中的註冊；待下次執行批次時重新觸發載入流程，達到Runtime更新的目的
 * 實作方法：reloadJobFlow方法實作上述邏輯並提供API
